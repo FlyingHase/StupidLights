@@ -1,5 +1,5 @@
 blueprint:
-  source_url:https://github.com/FlyingHase/StupidLights/new/main
+  source_url:https://github.com/FlyingHase/StupidLights/tree/main
   name: ZHA - IKEA TRADFRI - 5 Button Remote - Custom Actions
 
   description: >-
