@@ -1,160 +1,154 @@
 blueprint:
-  source_url:https://github.com/FlyingHase/StupidLights/blob/main/potato.yaml
-  name: ZHA - IKEA TRADFRI - 5 Button Remote - Custom Actions
+  name: deCONZ - IKEA five button remote for lights
+  description: 'Control lights with an IKEA five button remote (the round ones).
 
-  description: >-
-    This automation simulates the use of the IKEA TRADFRI remote control
-    connected through ZHA.
+
+    The middle "on" button, toggle the lights on/off to the last set brightness (unless the force brightness is toggled on in the blueprint).
+
+    Dim up/down buttons will change the brightness smoothly and can be pressed and hold until the brightness is satisfactory.
+
+    The "left" and "right" buttons can be assigned to an short and long button press action. This allows you to assign, e.g., a scene or anything else.
+    '
   domain: automation
-
   input:
     remote:
-      name: IKEA TRADFRI remote control
-      description: Select the remote control you wish to use.
+      name: Remote
+      description: IKEA remote to use
       selector:
         device:
-          integration: zha
+          integration: deconz
           manufacturer: IKEA of Sweden
           model: TRADFRI remote control
-    power_short:
-      name: Short Press - Power Button
-      description: The action to perform on Short Press of the Power Button
+    light:
+      name: Light(s)
+      description: The light(s) to control
       selector:
-        action:
-      default: []
-    dimup_short:
-      name: Short Press - Dim Up Button
-      description: The action to perform on Short Press of the Dim Up Button
-      selector:
-        action:
-      default: []
-    dimdown_short:
-      name: Short Press - Dim Down Button
-      description: The action to perform on Short Press of the Dim Down Button
-      selector:
-        action:
-      default: []
-    colorup_short:
-      name: Short Press - Color Up Button
-      description: The action to perform on Short Press of the Color Up Button
-      selector:
-        action:
-      default: []
-    colordown_short:
-      name: Short Press - Color Down Button
-      description: The action to perform on Short Press of the Color Down Button
-      selector:
-        action:
-      default: []
-    power_long:
-      name: Long Press - Power Button
-      description: The action to perform on Long Press of the Power Button
-      selector:
-        action:
-      default: []
-    dimup_long:
-      name: Long Press - Dim Up Button
-      description: The action to perform on Long Press of the Dim Up Button
-      selector:
-        action:
-      default: []
-    dimdown_long:
-      name: Long Press - Dim Down Button
-      description: The action to perform on Long Press of the Dim Down Button
-      selector:
-        action:
-      default: []
-    colorup_long:
-      name: Long Press - Color Up Button
-      description: The action to perform on Long Press of the Color Up Button
-      selector:
-        action:
-      default: []
-    colordown_long:
-      name: Long Press - Color Down Button
-      description: The action to perform on Long Press of the Color Down Button
-      selector:
-        action:
-      default: []
+        target:
+          entity:
+            domain: light
+    force_brightness:
+      name: Force turn on brightness
+      description:
+        'Force the brightness to the set level below, when the "on" button
+        on the remote is pushed and lights turn on.
 
+        '
+      default: false
+      selector:
+        boolean: {}
+    brightness:
+      name: Brightness
+      description: Brightness of the light(s) when turning on
+      default: 50
+      selector:
+        number:
+          min: 0.0
+          max: 100.0
+          mode: slider
+          step: 1.0
+          unit_of_measurement: "%"
+    button_left_short:
+      name: Left button - short press
+      description: Action to run on short left button press
+      default: []
+      selector:
+        action: {}
+    button_left_long:
+      name: Left button - long press
+      description: Action to run on long left button press
+      default: []
+      selector:
+        action: {}
+    button_right_short:
+      name: Right button - short press
+      description: Action to run on short right button press
+      default: []
+      selector:
+        action: {}
+    button_right_long:
+      name: Right button - long press
+      description: Action to run on long right button press
+      default: []
+      selector:
+        action: {}
 mode: restart
 max_exceeded: silent
-
+variables:
+  force_brightness: !input "force_brightness"
 trigger:
   - platform: event
-    event_type: zha_event
+    event_type: deconz_event
     event_data:
-      device_id: !input remote
-
+      device_id: !input "remote"
 action:
+  - variables:
+      event: "{{ trigger.event.data.event }}"
   - choose:
-      # Short-Press on the power button.
       - conditions:
-          - condition: template
-            value_template: '{{ trigger.event.data.command == "toggle" }}'
-        sequence: !input power_short
-
-      # Long-Press on the power button.
+          - "{{ event == 1002 }}"
+        sequence:
+          - choose:
+              - conditions: "{{ force_brightness }}"
+                sequence:
+                  - service: light.toggle
+                    target: !input "light"
+                    data:
+                      transition: 1
+                      brightness_pct: !input "brightness"
+            default:
+              - service: light.toggle
+                target: !input "light"
+                data:
+                  transition: 1
       - conditions:
-          - condition: template
-            value_template: '{{ trigger.event.data.command == "move_to_level_with_on_off" }}'
-        sequence: !input power_long
-
-      # Short-Press on the dim-up button.
+          - "{{ event == 2002 }}"
+        sequence:
+          - service: light.turn_on
+            target: !input "light"
+            data:
+              brightness_step_pct: 10
+              transition: 1
       - conditions:
-          - condition: template
-            value_template: '{{ trigger.event.data.command == "step_with_on_off" }}'
-        sequence: !input dimup_short
-
-      # Long-Press on the dim-up button.
+          - "{{ event == 2001 }}"
+        sequence:
+          - repeat:
+              count: 10
+              sequence:
+                - service: light.turn_on
+                  target: !input "light"
+                  data:
+                    brightness_step_pct: 10
+                    transition: 1
+                - delay: 1
       - conditions:
-          - condition: template
-            value_template: '{{ trigger.event.data.command == "move_with_on_off" }}'
-        sequence: !input dimup_long
-
-      # Short-Press on the dim-down button.
+          - "{{ event == 3002 }}"
+        sequence:
+          - service: light.turn_on
+            target: !input "light"
+            data:
+              brightness_step_pct: -10
+              transition: 1
       - conditions:
-          - condition: template
-            value_template: '{{ trigger.event.data.command == "step" }}'
-        sequence: !input dimdown_short
-
-      # Long-Press on the dim-down button.
+          - "{{ event == 3001 }}"
+        sequence:
+          - repeat:
+              count: 10
+              sequence:
+                - service: light.turn_on
+                  target: !input "light"
+                  data:
+                    brightness_step_pct: -10
+                    transition: 1
+                - delay: 1
       - conditions:
-          - condition: template
-            value_template: '{{ trigger.event.data.command == "move" }}'
-        sequence: !input dimdown_long
-
-      # Short-Press on the color-up button.
+          - "{{ event == 4002 }}"
+        sequence: !input "button_left_short"
       - conditions:
-          - condition: template
-            value_template: '{{ trigger.event.data.command == "press" }}'
-          - condition: template
-            value_template: "{{ trigger.event.data.args == [256,13,0] }}"
-        sequence: !input colorup_short
-
-      # Long-Press on the color-up button.
+          - "{{ event == 4001 }}"
+        sequence: !input "button_left_long"
       - conditions:
-          - condition: template
-            value_template: '{{ trigger.event.data.command == "hold" }}'
-          - condition: template
-            value_template: "{{ trigger.event.data.args == [3328,0] }}"
-        sequence: !input colorup_long
-
-      # Short-Press on the color-down button.
+          - "{{ event == 5002 }}"
+        sequence: !input "button_right_short"
       - conditions:
-          - condition: template
-            value_template: '{{ trigger.event.data.command == "press" }}'
-          - condition: template
-            value_template: "{{ trigger.event.data.args == [257,13,0] }}"
-        sequence: !input colordown_short
-
-      # Long-Press on the color-down button.
-      - conditions:
-          - condition: template
-            value_template: '{{ trigger.event.data.command == "hold" }}'
-          - condition: template
-            value_template: "{{ trigger.event.data.args == [3329,0] }}"
-        sequence: !input colordown_long
-
-    # Any other event will cancel the repeat loops.
-    default: []
+          - "{{ event == 5001 }}"
+        sequence: !input "button_right_long"
